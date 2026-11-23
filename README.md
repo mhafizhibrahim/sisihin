@@ -11,7 +11,7 @@ Namanya dari kata "sisihin" — sisihkan uang sedikit-sedikit sampai targetnya k
 [![GitHub release](https://img.shields.io/github/v/release/mhafizhibrahim/sisihin)](https://github.com/mhafizhibrahim/sisihin/releases/latest)
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-brightgreen)
 
-Versi terbaru: **[v1.1.2](https://github.com/mhafizhibrahim/sisihin/releases/tag/v1.1.2)** (GitHub Releases)
+Versi terbaru: **[v1.1.3](https://github.com/mhafizhibrahim/sisihin/releases/tag/v1.1.3)** (GitHub Releases)
 
 ## Fitur
 

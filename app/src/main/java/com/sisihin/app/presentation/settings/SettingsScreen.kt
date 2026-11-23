@@ -92,6 +92,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     }
     var message by remember { mutableStateOf<String?>(null) }
     var delayMenu by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateRelease by remember { mutableStateOf<UpdateChecker.ReleaseInfo?>(null) }
@@ -113,6 +114,55 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             text = { Text(it, color = colors.textSecondary) },
             confirmButton = {
                 TextButton(onClick = { message = null }) { Text("OK", color = colors.accentSoftContent) }
+            }
+        )
+    }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
+            title = { Text("Tentang Sisihin", color = colors.textPrimary) },
+            text = {
+                val aboutScroll = rememberScrollState()
+                Column(
+                    modifier = Modifier.verticalScroll(aboutScroll),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Sisihin adalah aplikasi Android untuk mencatat celengan dan target tabungan dengan cara sederhana. " +
+                            "Buat beberapa target, catat setoran dan penarikan, pantau progres, lalu arsipkan yang sudah tercapai.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Semua data disimpan di perangkat (lokal) dan bisa dibackup/restore ke file JSON. " +
+                            "Ada fitur pengingat, kunci aplikasi (biometrik/PIN sesuai pengaturan perangkat), beberapa mata uang, " +
+                            "serta kalkulator bantu untuk menyusun rencana menabung.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Pembaruan aplikasi dicek dari GitHub Releases (opsional). Kamu bisa unduh APK terbaru dari halaman rilis atau lewat menu Cek Pembaruan di Pengaturan.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Versi terpasang: $versionName",
+                        color = colors.textPrimary,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        "Sumber & rilis: github.com/mhafizhibrahim/sisihin",
+                        color = colors.textMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) { Text("Tutup", color = colors.accentSoftContent) }
             }
         )
     }
@@ -289,6 +339,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable { showAboutDialog = true }
                         .padding(MaterialTheme.spacing.lg),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -301,7 +352,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     Column(modifier = Modifier.padding(start = MaterialTheme.spacing.md)) {
                         Text("Tentang Sisihin", color = colors.textPrimary, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Aplikasi pelacak celengan dan target tabungan.",
+                            "Ketuk untuk melihat informasi aplikasi.",
                             color = colors.textSecondary
                         )
                     }
