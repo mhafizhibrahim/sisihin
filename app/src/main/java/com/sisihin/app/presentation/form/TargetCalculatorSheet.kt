@@ -8,9 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -23,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -34,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -46,14 +49,21 @@ import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.core.util.CurrencyFormatter
 import com.sisihin.app.domain.model.CurrencyCode
 import com.sisihin.app.domain.model.PlanFrequency
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.ceil
 
-private val SheetShape = RoundedCornerShape(8.dp)
+private val SheetFieldShape = RoundedCornerShape(14.dp)
+private val SheetCardShape = RoundedCornerShape(14.dp)
+private val SheetTrackShape = RoundedCornerShape(14.dp)
+private val SheetTrackItemShape = RoundedCornerShape(10.dp)
 private val SheetPillShape = RoundedCornerShape(50)
 private val SheetSpring = spring<Color>(
     dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessMediumLow
 )
+private val SheetDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy", Locale("id", "ID"))
 
 @Composable
 private fun sheetFieldColors() = with(LocalSisihinColors.current) {
@@ -70,10 +80,27 @@ private fun sheetFieldColors() = with(LocalSisihinColors.current) {
     )
 }
 
+@Composable
+private fun sheetChipColors() = with(LocalSisihinColors.current) {
+    FilterChipDefaults.filterChipColors(
+        containerColor = cardSurface,
+        labelColor = textSecondary,
+        selectedContainerColor = accentSoftContainer,
+        selectedLabelColor = accentSoftContent
+    )
+}
+
 private fun PlanFrequency.sheetLabel(): String = when (ordinal) {
     0 -> "Harian"
     1 -> "Mingguan"
     else -> "Bulanan"
+}
+
+/** Satuan periode: Hari / Minggu / Bulan (untuk label input & hasil). */
+private fun PlanFrequency.unitLabel(): String = when (ordinal) {
+    0 -> "Hari"
+    1 -> "Minggu"
+    else -> "Bulan"
 }
 
 private fun PlanFrequency.daysPerPeriod(): Long = when (ordinal) {
@@ -82,47 +109,57 @@ private fun PlanFrequency.daysPerPeriod(): Long = when (ordinal) {
     else -> 30L
 }
 
+/** Chip cepat durasi (mode Cari Nominal), sesuai frekuensi. */
+private fun PlanFrequency.quickDurations(): List<Long> = when (ordinal) {
+    0 -> listOf(7L, 14L, 30L, 90L)
+    1 -> listOf(4L, 8L, 12L, 24L)
+    else -> listOf(3L, 6L, 12L, 24L)
+}
+
+private val QuickAmounts = listOf(10_000L, 20_000L, 50_000L, 100_000L)
+
+/** Label chip nominal: angka saja tanpa simbol mata uang. */
+private fun amountChipLabel(amount: Long, currency: CurrencyCode): String =
+    CurrencyFormatter.format(amount, currency).removePrefix(currency.symbol).trim()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TargetCalculatorSheet(
     initialTargetText: String,
     initialFrequency: PlanFrequency,
-    onApply: (PlanFrequency, Long) -> Unit,
+    currencyCode: CurrencyCode = CurrencyCode.IDR,
+    onApply: (PlanFrequency, Long, Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = LocalSisihinColors.current
-    var mode by remember { mutableStateOf(0) } // 0 = cari nominal, 1 = cari estimasi waktu
+    var mode by remember { mutableStateOf(0) } // 0 = cari nominal, 1 = cari waktu
     var targetText by remember { mutableStateOf<TextFieldValue>(CurrencyFormatter.inputValue(initialTargetText)) }
     var inputText by remember { mutableStateOf<TextFieldValue>(CurrencyFormatter.inputValue("")) }
     var frequency by remember { mutableStateOf(initialFrequency) }
-    var resultText by remember { mutableStateOf("") }
-    var computedAmount by remember { mutableStateOf(0L) }
+    // Varian kartu/input diputus sekali dari nilai awal. Bila ikut nilai live,
+    // field hilang setelah digit pertama (target > 0) dan fokus ketik terputus.
+    val showTargetCard = remember { CurrencyFormatter.parse(initialTargetText) > 0L }
     val fieldColors = sheetFieldColors()
+    val chipColors = sheetChipColors()
 
-    fun recompute() {
-        val target = CurrencyFormatter.parse(targetText.text)
-        if (mode == 0) {
-            val days = inputText.text.filter { it.isDigit() }.toLongOrNull() ?: 0L
-            val periods = if (days <= 0L) 0L else ceil(days.toDouble() / frequency.daysPerPeriod().toDouble()).toLong().coerceAtLeast(1L)
-            val amount = if (periods > 0L) ceil(target.toDouble() / periods.toDouble()).toLong() else 0L
-            computedAmount = amount
-            resultText = if (amount > 0L) {
-                "Nominal per ${frequency.sheetLabel().lowercase()}: ${CurrencyFormatter.format(amount, CurrencyCode.IDR)}"
-            } else {
-                "Isi target dan jumlah hari terlebih dahulu"
-            }
-        } else {
-            val amount = CurrencyFormatter.parse(inputText.text)
-            computedAmount = amount
-            val periods = if (amount > 0L && target > 0L) ceil(target.toDouble() / amount.toDouble()).toLong() else 0L
-            resultText = if (periods > 0L) {
-                "Estimasi $periods ${frequency.sheetLabel().lowercase()} (${
-                    periods * frequency.daysPerPeriod()
-                } hari)"
-            } else {
-                "Isi target dan nominal per periode terlebih dahulu"
-            }
-        }
+    // Perhitungan live: tidak ada tombol "Hitung", hasil ikut setiap ketikan.
+    val target = CurrencyFormatter.parse(targetText.text)
+    val inputValue = CurrencyFormatter.parse(inputText.text)
+    val periods = if (mode == 0) {
+        inputValue
+    } else {
+        if (inputValue > 0L && target > 0L) ceil(target.toDouble() / inputValue.toDouble()).toLong() else 0L
+    }
+    val planAmount = if (mode == 0) {
+        if (periods > 0L && target > 0L) ceil(target.toDouble() / periods.toDouble()).toLong() else 0L
+    } else {
+        inputValue
+    }
+    val valid = target > 0L && periods > 0L && planAmount > 0L
+    val estimateDate = if (valid) {
+        LocalDate.now().plusDays(periods * frequency.daysPerPeriod()).format(SheetDateFormatter)
+    } else {
+        null
     }
 
     ModalBottomSheet(
@@ -138,139 +175,206 @@ fun TargetCalculatorSheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Kalkulator Target", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SheetModeChip("Cari Nominal", mode == 0, Modifier.weight(1f)) { mode = 0; resultText = ""; computedAmount = 0L }
-                SheetModeChip("Cari Waktu", mode == 1, Modifier.weight(1f)) { mode = 1; resultText = ""; computedAmount = 0L }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Kalkulator Target", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Hitung otomatis nominal atau lama menabung",
+                    color = colors.textSecondary,
+                    fontSize = 12.sp
+                )
             }
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PlanFrequency.entries.forEach { option ->
-                    SheetFrequencyChip(option, frequency == option, Modifier.weight(1f)) {
-                        frequency = option
-                        resultText = ""
-                        computedAmount = 0L
+            // Kartu info target; bila form utama masih kosong, sediakan input di sini.
+            if (showTargetCard) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SheetCardShape)
+                        .background(colors.cardSurface)
+                        .border(0.8.dp, colors.hairlineBorder, SheetCardShape)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("Target Tabungan", color = colors.textSecondary, fontSize = 12.sp)
+                    Text(
+                        CurrencyFormatter.format(target, currencyCode),
+                        color = colors.textPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = targetText,
+                    onValueChange = { targetText = CurrencyFormatter.formatInput(it) },
+                    label = { Text("Target Tabungan") },
+                    supportingText = if (target <= 0L) {
+                        {
+                            Text(
+                                "Isi Target Tabungan terlebih dahulu",
+                                color = colors.textMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    singleLine = true,
+                    shape = SheetFieldShape,
+                    colors = fieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // Baris 1: mode. Baris 2: frekuensi. Pill-track bersih tanpa garis kotak.
+            SheetPillTrack(
+                labels = listOf("Cari Nominal", "Cari Waktu"),
+                selectedIndex = mode,
+                onSelect = { mode = it }
+            )
+            SheetPillTrack(
+                labels = PlanFrequency.entries.map { it.sheetLabel() },
+                selectedIndex = frequency.ordinal,
+                onSelect = { frequency = PlanFrequency.entries[it] }
+            )
+
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = CurrencyFormatter.formatInput(it) },
+                label = {
+                    Text(
+                        if (mode == 0) "Jumlah ${frequency.unitLabel()}"
+                        else "Nominal per ${frequency.unitLabel()}"
+                    )
+                },
+                singleLine = true,
+                shape = SheetFieldShape,
+                colors = fieldColors,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // 4 chip cepat adaptif, 2 per baris agar nominal panjang tidak terpotong.
+            val quickValues = if (mode == 0) frequency.quickDurations() else QuickAmounts
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                quickValues.chunked(2).forEach { rowValues ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowValues.forEach { quick ->
+                            FilterChip(
+                                selected = inputValue == quick,
+                                onClick = { inputText = CurrencyFormatter.inputValue(quick) },
+                                label = {
+                                    Text(
+                                        text = if (mode == 0) {
+                                            "$quick ${frequency.unitLabel()}"
+                                        } else {
+                                            amountChipLabel(quick, currencyCode)
+                                        },
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                },
+                                colors = chipColors,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
 
-            OutlinedTextField(
-                value = targetText,
-                onValueChange = {
-                    targetText = CurrencyFormatter.formatInput(it)
-                    resultText = ""
-                    computedAmount = 0L
-                },
-                label = { Text("Target Tabungan") },
-                singleLine = true,
-                shape = SheetShape,
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = {
-                    inputText = CurrencyFormatter.formatInput(it)
-                    resultText = ""
-                    computedAmount = 0L
-                },
-                label = { Text(if (mode == 0) "Jumlah Hari" else "Nominal Per Periode") },
-                singleLine = true,
-                shape = SheetShape,
-                colors = fieldColors,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Button(
-                onClick = { recompute() },
-                modifier = Modifier.fillMaxWidth().height(42.dp),
-                shape = SheetShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = colors.cardSurface,
-                    contentColor = colors.textPrimary
-                ),
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) { Text("Hitung", fontSize = 14.sp, fontWeight = FontWeight.Medium) }
-
-            if (resultText.isNotBlank()) {
-                Text(resultText, color = colors.textSecondary, fontSize = 13.sp)
+            // Kartu hasil live beraksen biru lembut.
+            if (valid) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(SheetCardShape)
+                        .background(colors.accentSoftContainer)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = if (mode == 0) {
+                            "${CurrencyFormatter.format(planAmount, currencyCode)} / ${frequency.unitLabel().lowercase()}"
+                        } else {
+                            "$periods ${frequency.unitLabel()}"
+                        },
+                        color = colors.accentSoftContent,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Estimasi tercapai: $estimateDate",
+                        color = colors.textSecondary,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
             Button(
-                onClick = {
-                    if (resultText.isBlank()) recompute()
-                    if (computedAmount > 0L) onApply(frequency, computedAmount)
-                },
-                modifier = Modifier.fillMaxWidth().height(44.dp),
+                onClick = { if (valid) onApply(frequency, planAmount, target) },
+                enabled = valid,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .alpha(if (valid) 1f else 0.5f),
                 shape = SheetPillShape,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.accentBlue,
-                    contentColor = colors.onAccent
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp)
-            ) { Text("Terapkan", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+                    contentColor = colors.onAccent,
+                    disabledContainerColor = colors.accentBlue,
+                    disabledContentColor = colors.onAccent
+                )
+            ) { Text("Terapkan ke Rencana", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
 
             Spacer(Modifier.height(12.dp))
         }
     }
 }
 
+/** Pill-track menyatu: satu kapsul luar, item aktif pil penuh, tanpa border per item. */
 @Composable
-private fun SheetModeChip(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun SheetPillTrack(labels: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     val colors = LocalSisihinColors.current
-    val background by animateThemeColor(
-        targetValue = if (selected) colors.accentSoftContainer else colors.cardSurface,
-        animationSpec = SheetSpring,
-        label = "calculatorMode"
-    )
-    Box(
-        modifier = modifier
-            .height(38.dp)
-            .clip(SheetShape)
-            .background(background)
-            .border(0.8.dp, colors.hairlineBorder, SheetShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .clip(SheetTrackShape)
+            .background(colors.cardSurface)
+            .border(0.8.dp, colors.hairlineBorder, SheetTrackShape)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(
-            label,
-            color = if (selected) colors.accentSoftContent else colors.textSecondary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-private fun SheetFrequencyChip(
-    frequency: PlanFrequency,
-    selected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val colors = LocalSisihinColors.current
-    val background by animateThemeColor(
-        targetValue = if (selected) colors.accentSoftContainer else colors.cardSurface,
-        animationSpec = SheetSpring,
-        label = "calculatorFrequency"
-    )
-    Box(
-        modifier = modifier
-            .height(38.dp)
-            .clip(SheetShape)
-            .background(background)
-            .border(0.8.dp, colors.hairlineBorder, SheetShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            frequency.sheetLabel(),
-            color = if (selected) colors.accentSoftContent else colors.textSecondary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium
-        )
+        labels.forEachIndexed { index, label ->
+            val active = index == selectedIndex
+            val backgroundColor by animateThemeColor(
+                targetValue = if (active) colors.accentSoftContainer else Color.Transparent,
+                animationSpec = SheetSpring,
+                label = "sheetTrack$label"
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(SheetTrackItemShape)
+                    .background(backgroundColor)
+                    .clickable { onSelect(index) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    color = if (active) colors.accentSoftContent else colors.textSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+        }
     }
 }

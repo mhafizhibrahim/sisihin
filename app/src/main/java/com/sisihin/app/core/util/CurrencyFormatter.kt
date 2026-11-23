@@ -24,7 +24,8 @@ object CurrencyFormatter {
     }
 
     fun format(amount: Long, currency: CurrencyCode): String {
-        val pattern = if (currency == CurrencyCode.IDR || currency == CurrencyCode.JPY) "#,##0" else "#,##0.00"
+        val zeroDecimal = currency == CurrencyCode.IDR || currency == CurrencyCode.JPY || currency == CurrencyCode.KRW
+        val pattern = if (zeroDecimal) "#,##0" else "#,##0.00"
         val formatter = amountFormatters.get()!!.getOrPut(pattern) { DecimalFormat(pattern, groupingSymbols) }
         return "${currency.symbol} ${formatter.format(amount.toDouble())}".trim()
     }

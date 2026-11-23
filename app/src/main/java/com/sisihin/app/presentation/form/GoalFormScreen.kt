@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -112,6 +111,9 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 private val FieldShape = RoundedCornerShape(8.dp)
+private val DropdownShape = RoundedCornerShape(14.dp)
+private val TrackShape = RoundedCornerShape(14.dp)
+private val TrackItemShape = RoundedCornerShape(10.dp)
 private val PhotoCorner = 16.dp
 private val PhotoShape = RoundedCornerShape(PhotoCorner)
 private val PillShape = RoundedCornerShape(50)
@@ -170,6 +172,13 @@ private fun PlanFrequency.label(): String = when (ordinal) {
     else -> "Bulanan"
 }
 
+/** Kata periode untuk kalimat helper, mis. "Disisihkan setiap minggu". */
+private fun PlanFrequency.periodWord(): String = when (ordinal) {
+    0 -> "hari"
+    1 -> "minggu"
+    else -> "bulan"
+}
+
 private fun flagRes(currency: CurrencyCode): Int = when (currency) {
     CurrencyCode.IDR -> R.drawable.flag_id
     CurrencyCode.USD -> R.drawable.flag_us
@@ -177,7 +186,10 @@ private fun flagRes(currency: CurrencyCode): Int = when (currency) {
     CurrencyCode.EUR -> R.drawable.flag_eu
     CurrencyCode.SGD -> R.drawable.flag_sg
     CurrencyCode.MYR -> R.drawable.flag_my
+    CurrencyCode.KRW -> R.drawable.flag_kr
     CurrencyCode.GBP -> R.drawable.flag_gb
+    CurrencyCode.AUD -> R.drawable.flag_au
+    CurrencyCode.SAR -> R.drawable.flag_sa
 }
 
 private fun CurrencyCode.formLabel(): String = label.replace("(", "( ").replace(")", " )")
@@ -228,6 +240,7 @@ fun GoalFormScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
@@ -237,7 +250,7 @@ fun GoalFormScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(56.dp)
                             .clip(ChipShape)
                             .clickable {
                                 viewModel.setCurrency(currency)
@@ -248,12 +261,20 @@ fun GoalFormScreen(
                     ) {
                         CurrencyFlagIcon(currency)
                         Spacer(Modifier.width(14.dp))
-                        Text(
-                            currency.formLabel(),
-                            color = colors.textPrimary,
-                            fontSize = 14.sp,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                currency.formLabel(),
+                                color = colors.textPrimary,
+                                fontSize = 14.sp,
+                                maxLines = 1
+                            )
+                            Text(
+                                "${currency.name} • ${currency.symbol}",
+                                color = colors.textSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
                         if (currency == state.currency) {
                             Icon(
                                 imageVector = Icons.Rounded.Check,
@@ -333,8 +354,13 @@ fun GoalFormScreen(
         TargetCalculatorSheet(
             initialTargetText = state.targetAmountText.text,
             initialFrequency = state.planFrequency,
-            onApply = { frequency, amount ->
+            currencyCode = state.currency,
+            onApply = { frequency, amount, target ->
                 viewModel.applyCalculator(frequency, amount)
+                // Bila target diisi dari dalam kalkulator (form masih kosong), ikut terapkan.
+                if (target > 0L && CurrencyFormatter.parse(state.targetAmountText.text) <= 0L) {
+                    viewModel.onTargetAmountChange(CurrencyFormatter.inputValue(target))
+                }
                 calculatorSheetOpen = false
             },
             onDismiss = { calculatorSheetOpen = false }
@@ -528,26 +554,39 @@ fun GoalFormScreen(
                 )
             }
             InputRow(iconColumnWidth, { CurrencyFlagIcon(state.currency) }) {
-                OutlinedTextField(
-                    value = state.currency.formLabel(),
-                    onValueChange = {},
-                    label = { Text("Mata Uang") },
-                    readOnly = true,
-                    singleLine = true,
-                    shape = FieldShape,
-                    colors = fieldColors,
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDropDown,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = colors.textSecondary
-                        )
-                    },
+                // OutlinedTextField readOnly tetap mengonsumsi sentuhan, jadi klik
+                // dipasang pada overlay matchParentSize di atasnya — bukan pada
+                // modifier field (tidak pernah terpanggil) dan bukan enabled=false.
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(DropdownShape)
                         .clickable { currencySheetOpen = true }
-                )
+                ) {
+                    OutlinedTextField(
+                        value = state.currency.formLabel(),
+                        onValueChange = {},
+                        label = { Text("Mata Uang") },
+                        readOnly = true,
+                        singleLine = true,
+                        shape = DropdownShape,
+                        colors = fieldColors,
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = colors.textSecondary
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { currencySheetOpen = true }
+                    )
+                }
             }
             Spacer(Modifier.height(18.dp))
             HorizontalDivider(thickness = 0.8.dp, color = colors.divider)
@@ -596,6 +635,11 @@ fun GoalFormScreen(
                 }
             }
             val targetDateMillis = state.targetDateMillis
+            Text(
+                "Disisihkan setiap ${state.planFrequency.periodWord()}",
+                color = colors.textMuted,
+                fontSize = 12.sp
+            )
             if (targetDateMillis != null) {
                 Text(
                     "Target tercapai pada ${formatTargetDate(targetDateMillis)}",
@@ -760,57 +804,42 @@ private fun CurrencyFlagIcon(currency: CurrencyCode) {
 @Composable
 private fun FrequencyPill(selected: PlanFrequency, onSelect: (PlanFrequency) -> Unit) {
     val colors = LocalSisihinColors.current
+    // Pill-track menyatu: satu kapsul luar, item tanpa border/garis pemisah.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(42.dp)
-            .clip(PillShape)
-            .border(0.8.dp, colors.hairlineBorder, PillShape)
+            .height(50.dp)
+            .clip(TrackShape)
+            .background(colors.cardSurface)
+            .border(0.8.dp, colors.hairlineBorder, TrackShape)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        PlanFrequency.entries.forEachIndexed { index, frequency ->
-            if (index > 0) {
-                VerticalDivider(
-                    modifier = Modifier.fillMaxHeight(),
-                    thickness = 0.8.dp,
-                    color = colors.divider
+        PlanFrequency.entries.forEach { frequency ->
+            val active = frequency == selected
+            val backgroundColor by animateThemeColor(
+                targetValue = if (active) colors.accentSoftContainer else Color.Transparent,
+                animationSpec = MicroSpring,
+                label = "frequencyTrack${frequency.name}"
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(TrackItemShape)
+                    .background(backgroundColor)
+                    .clickable { onSelect(frequency) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    frequency.label(),
+                    color = if (active) colors.accentSoftContent else colors.textSecondary,
+                    fontSize = 14.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
-            FrequencySegment(
-                frequency = frequency,
-                active = frequency == selected,
-                modifier = Modifier.weight(1f),
-                onSelect = onSelect
-            )
         }
-    }
-}
-
-@Composable
-private fun RowScope.FrequencySegment(
-    frequency: PlanFrequency,
-    active: Boolean,
-    modifier: Modifier,
-    onSelect: (PlanFrequency) -> Unit
-) {
-    val colors = LocalSisihinColors.current
-    val backgroundColor by animateThemeColor(
-        targetValue = if (active) colors.accentSoftContainer else colors.cardSurface,
-        animationSpec = MicroSpring,
-        label = "segmentBackground"
-    )
-    Box(
-        modifier = modifier
-            .height(42.dp)
-            .clip(PillShape)
-            .background(backgroundColor)
-            .clickable { onSelect(frequency) },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            frequency.label(),
-            color = if (active) colors.accentSoftContent else colors.textSecondary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
     }
 }

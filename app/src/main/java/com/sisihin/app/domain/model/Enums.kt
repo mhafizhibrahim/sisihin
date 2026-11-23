@@ -13,7 +13,10 @@ enum class CurrencyCode(val symbol: String, val flag: String, val label: String)
     EUR("€", "🇪🇺", "Euro (€)"),
     SGD("S$", "🇸🇬", "Singapore Dollar (S$)"),
     MYR("RM", "🇲🇾", "Malaysian Ringgit (RM)"),
-    GBP("£", "🇬🇧", "British Pound (£)")
+    KRW("₩", "🇰🇷", "South Korean Won (₩)"),
+    GBP("£", "🇬🇧", "British Pound (£)"),
+    AUD("A$", "🇦🇺", "Australian Dollar (A$)"),
+    SAR("﷼", "🇸🇦", "Saudi Riyal (﷼)")
 }
 
 enum class SortOption(val label: String) {
