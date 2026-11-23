@@ -1,6 +1,5 @@
 package com.sisihin.app.presentation.common
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -53,6 +52,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.sisihin.app.SisihinApplication
 import com.sisihin.app.core.theme.LocalSisihinColors
+import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.presentation.detail.GoalDetailScreen
 import com.sisihin.app.presentation.detail.GoalDetailViewModel
 import com.sisihin.app.presentation.form.GoalFormScreen
@@ -203,17 +203,17 @@ private fun SlimBottomBar(currentPage: Int, onSelect: (Int) -> Unit) {
                         dampingRatio = Spring.DampingRatioNoBouncy,
                         stiffness = Spring.StiffnessMediumLow
                     )
-                    val pillColor by animateColorAsState(
+                    val pillColor by animateThemeColor(
                         targetValue = if (active) colors.accentSoftContainer else colors.background,
                         animationSpec = navSpring,
                         label = "navPill$index"
                     )
-                    val iconColor by animateColorAsState(
+                    val iconColor by animateThemeColor(
                         targetValue = if (active) colors.accentBlue else colors.textMuted,
                         animationSpec = navSpring,
                         label = "navIcon$index"
                     )
-                    val labelColor by animateColorAsState(
+                    val labelColor by animateThemeColor(
                         targetValue = if (active) colors.accentBlue else colors.textMuted,
                         animationSpec = navSpring,
                         label = "navLabel$index"

@@ -7,7 +7,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -101,6 +100,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.sisihin.app.R
 import com.sisihin.app.core.theme.LocalSisihinColors
+import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.core.util.CurrencyFormatter
 import com.sisihin.app.domain.model.CurrencyCode
 import com.sisihin.app.domain.model.PlanFrequency
@@ -701,17 +701,17 @@ fun GoalFormScreen(
                         state.reminderEnabled -> colors.textSecondary
                         else -> colors.textMuted
                     }
-                    val containerColor by animateColorAsState(
+                    val containerColor by animateThemeColor(
                         targetValue = containerTarget,
                         animationSpec = MicroSpring,
                         label = "dayContainer"
                     )
-                    val borderColor by animateColorAsState(
+                    val borderColor by animateThemeColor(
                         targetValue = borderTarget,
                         animationSpec = MicroSpring,
                         label = "dayBorder"
                     )
-                    val textColor by animateColorAsState(
+                    val textColor by animateThemeColor(
                         targetValue = textTarget,
                         animationSpec = MicroSpring,
                         label = "dayText"
@@ -793,7 +793,7 @@ private fun RowScope.FrequencySegment(
     onSelect: (PlanFrequency) -> Unit
 ) {
     val colors = LocalSisihinColors.current
-    val backgroundColor by animateColorAsState(
+    val backgroundColor by animateThemeColor(
         targetValue = if (active) colors.accentSoftContainer else colors.cardSurface,
         animationSpec = MicroSpring,
         label = "segmentBackground"

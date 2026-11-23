@@ -1,6 +1,5 @@
 package com.sisihin.app.presentation.form
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sisihin.app.core.theme.LocalSisihinColors
+import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.core.util.CurrencyFormatter
 import com.sisihin.app.domain.model.CurrencyCode
 import com.sisihin.app.domain.model.PlanFrequency
@@ -221,7 +221,7 @@ fun TargetCalculatorSheet(
 @Composable
 private fun SheetModeChip(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val colors = LocalSisihinColors.current
-    val background by animateColorAsState(
+    val background by animateThemeColor(
         targetValue = if (selected) colors.accentSoftContainer else colors.cardSurface,
         animationSpec = SheetSpring,
         label = "calculatorMode"
@@ -252,7 +252,7 @@ private fun SheetFrequencyChip(
     onClick: () -> Unit
 ) {
     val colors = LocalSisihinColors.current
-    val background by animateColorAsState(
+    val background by animateThemeColor(
         targetValue = if (selected) colors.accentSoftContainer else colors.cardSurface,
         animationSpec = SheetSpring,
         label = "calculatorFrequency"

@@ -3,7 +3,6 @@ package com.sisihin.app.presentation.settings
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -65,6 +64,7 @@ import com.sisihin.app.SisihinApplication
 import com.sisihin.app.core.components.SisihinCard
 import com.sisihin.app.core.security.BiometricAuthManager
 import com.sisihin.app.core.theme.LocalSisihinColors
+import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.core.theme.spacing
 import com.sisihin.app.data.repository.BackupRestoreManager
 import com.sisihin.app.data.update.UpdateChecker
@@ -438,12 +438,12 @@ private fun ThemeModePillRow(selected: AppThemeMode, onSelect: (AppThemeMode) ->
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = Spring.StiffnessMediumLow
             )
-            val containerColor by animateColorAsState(
+            val containerColor by animateThemeColor(
                 targetValue = if (active) colors.accentSoftContainer else colors.cardSurface,
                 animationSpec = pillSpring,
                 label = "themeModePill${mode.name}"
             )
-            val contentColor by animateColorAsState(
+            val contentColor by animateThemeColor(
                 targetValue = if (active) colors.accentSoftContent else colors.textSecondary,
                 animationSpec = pillSpring,
                 label = "themeModeText${mode.name}"

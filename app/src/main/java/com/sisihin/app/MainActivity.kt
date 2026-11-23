@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -29,6 +31,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.sisihin.app.core.security.AppLockManager
 import com.sisihin.app.core.security.BiometricAuthManager
+import com.sisihin.app.core.theme.InstagramDarkColors
+import com.sisihin.app.core.theme.InstagramLightColors
 import com.sisihin.app.core.theme.LocalSisihinColors
 import com.sisihin.app.core.theme.SisihinTheme
 import com.sisihin.app.domain.model.AppThemeMode
@@ -68,12 +72,19 @@ class MainActivity : FragmentActivity() {
                 AppThemeMode.LIGHT -> false
             }
 
-            // Cukup flip flag ikon; enableEdgeToEdge dipanggil sekali di onCreate.
-            DisposableEffect(isDarkTheme) {
+            // Sinkron dengan frame yang sama saat palet berganti: ikon system bar
+            // dan background window (area di belakang status/navigation bar) ikut
+            // tema seketika. enableEdgeToEdge tetap hanya sekali di onCreate.
+            val windowBackground = remember(isDarkTheme) {
+                android.graphics.drawable.ColorDrawable(
+                    (if (isDarkTheme) InstagramDarkColors else InstagramLightColors).background.toArgb()
+                )
+            }
+            SideEffect {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller?.isAppearanceLightStatusBars = !isDarkTheme
                 controller?.isAppearanceLightNavigationBars = !isDarkTheme
-                onDispose { }
+                window.setBackgroundDrawable(windowBackground)
             }
 
             LaunchedEffect(biometricEnabled, lockDelay) {
