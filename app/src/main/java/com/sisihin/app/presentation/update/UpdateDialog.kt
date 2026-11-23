@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,11 +50,17 @@ fun UpdateDialog(
 ) {
     val colors = LocalSisihinColors.current
     Dialog(onDismissRequest = onDismiss) {
+        val isDarkDialog = colors.background == Color(0xFF000000)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.elevatedSurface)
+                .border(
+                    width = 1.dp,
+                    color = if (isDarkDialog) Color(0xFF2A2A2A) else Color(0xFFE6E8EC),
+                    shape = RoundedCornerShape(16.dp)
+                )
                 .padding(MaterialTheme.spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

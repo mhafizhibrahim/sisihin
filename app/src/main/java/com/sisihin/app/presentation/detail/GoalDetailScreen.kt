@@ -167,6 +167,7 @@ fun GoalDetailScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
             title = { Text("Hapus celengan ini?", color = colors.textPrimary, fontWeight = FontWeight.SemiBold) },
             text = {
                 Text(
@@ -222,6 +223,7 @@ fun GoalDetailScreen(
         AlertDialog(
             onDismissRequest = { selectedTx = null },
             containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
             title = { Text("Ubah transaksi", color = colors.textPrimary, fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

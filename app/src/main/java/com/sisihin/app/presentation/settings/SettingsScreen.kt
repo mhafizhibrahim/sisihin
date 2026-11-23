@@ -108,6 +108,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         AlertDialog(
             onDismissRequest = { message = null },
             containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
             title = { Text("Informasi", color = colors.textPrimary) },
             text = { Text(it, color = colors.textSecondary) },
             confirmButton = {

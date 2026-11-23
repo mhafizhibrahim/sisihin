@@ -151,6 +151,7 @@ fun RecordTransactionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = colors.elevatedSurface,
+        tonalElevation = 0.dp,
         title = {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(

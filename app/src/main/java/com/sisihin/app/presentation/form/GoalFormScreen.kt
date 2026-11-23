@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableDates
+
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -64,7 +65,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -136,12 +136,12 @@ private fun formFieldColors() = with(LocalSisihinColors.current) {
         focusedLabelColor = textSecondary,
         unfocusedLabelColor = textSecondary,
         disabledLabelColor = textMuted,
-        focusedBorderColor = hairlineBorder,
+        focusedBorderColor = accentBlue,
         unfocusedBorderColor = hairlineBorder,
         disabledBorderColor = hairlineBorder,
-        focusedContainerColor = Color.Transparent,
-        unfocusedContainerColor = Color.Transparent,
-        disabledContainerColor = Color.Transparent,
+        focusedContainerColor = cardSurface,
+        unfocusedContainerColor = cardSurface,
+        disabledContainerColor = cardSurface,
         cursorColor = accentBlue,
         focusedTrailingIconColor = textSecondary,
         unfocusedTrailingIconColor = textSecondary
@@ -235,7 +235,8 @@ fun GoalFormScreen(
     if (currencySheetOpen) {
         ModalBottomSheet(
             onDismissRequest = { currencySheetOpen = false },
-            containerColor = colors.elevatedSurface
+            containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier
@@ -308,6 +309,7 @@ fun GoalFormScreen(
         AlertDialog(
             onDismissRequest = { targetDatePickerOpen = false },
             containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
             confirmButton = {
                 TextButton(onClick = {
                     val millis = datePickerState.selectedDateMillis
@@ -335,6 +337,7 @@ fun GoalFormScreen(
         AlertDialog(
             onDismissRequest = { reminderTimePickerOpen = false },
             containerColor = colors.elevatedSurface,
+            tonalElevation = 0.dp,
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.setReminderTime(timePickerState.hour, timePickerState.minute)
@@ -703,11 +706,6 @@ fun GoalFormScreen(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                VerticalDivider(
-                    Modifier.height(36.dp).padding(end = 18.dp),
-                    thickness = 0.8.dp,
-                    color = colors.divider
-                )
                 Switch(
                     checked = state.reminderEnabled,
                     onCheckedChange = { enabled ->
@@ -804,21 +802,25 @@ private fun CurrencyFlagIcon(currency: CurrencyCode) {
 @Composable
 private fun FrequencyPill(selected: PlanFrequency, onSelect: (PlanFrequency) -> Unit) {
     val colors = LocalSisihinColors.current
-    // Pill-track menyatu: satu kapsul luar, item tanpa border/garis pemisah.
+    val isDark = colors.background == Color(0xFF000000)
+    val trackBg = if (isDark) Color(0xFF222222) else Color(0xFFF1F3F5)
+    val trackBorder = if (isDark) Color(0xFF323232) else Color(0xFFE0E3E8)
+    val activeBg = if (isDark) Color(0xFF162B3D) else colors.accentBlue
+    val activeText = if (isDark) colors.accentSoftContent else Color(0xFFFFFFFF)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
             .clip(TrackShape)
-            .background(colors.cardSurface)
-            .border(0.8.dp, colors.hairlineBorder, TrackShape)
+            .background(trackBg)
+            .border(1.dp, trackBorder, TrackShape)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         PlanFrequency.entries.forEach { frequency ->
             val active = frequency == selected
             val backgroundColor by animateThemeColor(
-                targetValue = if (active) colors.accentSoftContainer else Color.Transparent,
+                targetValue = if (active) activeBg else Color.Transparent,
                 animationSpec = MicroSpring,
                 label = "frequencyTrack${frequency.name}"
             )
@@ -833,7 +835,7 @@ private fun FrequencyPill(selected: PlanFrequency, onSelect: (PlanFrequency) -> 
             ) {
                 Text(
                     frequency.label(),
-                    color = if (active) colors.accentSoftContent else colors.textSecondary,
+                    color = if (active) activeText else colors.textSecondary,
                     fontSize = 14.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     maxLines = 1,

@@ -2,6 +2,7 @@ package com.sisihin.app.presentation.form
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,9 +27,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,27 +70,38 @@ private val SheetDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
 
 @Composable
 private fun sheetFieldColors() = with(LocalSisihinColors.current) {
+    val isDark = background == Color(0xFF000000)
+    val unfocusedBorder = if (isDark) Color(0xFF363636) else Color(0xFFDADDE2)
     OutlinedTextFieldDefaults.colors(
         focusedTextColor = textPrimary,
         unfocusedTextColor = textPrimary,
         focusedLabelColor = textSecondary,
         unfocusedLabelColor = textSecondary,
-        focusedBorderColor = hairlineBorder,
-        unfocusedBorderColor = hairlineBorder,
-        focusedContainerColor = Color.Transparent,
-        unfocusedContainerColor = Color.Transparent,
+        focusedBorderColor = accentBlue,
+        unfocusedBorderColor = unfocusedBorder,
+        focusedContainerColor = cardSurface,
+        unfocusedContainerColor = cardSurface,
         cursorColor = accentBlue
     )
 }
 
 @Composable
-private fun sheetChipColors() = with(LocalSisihinColors.current) {
-    FilterChipDefaults.filterChipColors(
-        containerColor = cardSurface,
-        labelColor = textSecondary,
-        selectedContainerColor = accentSoftContainer,
-        selectedLabelColor = accentSoftContent
-    )
+private fun sheetChipColors(isSelected: Boolean) = with(LocalSisihinColors.current) {
+    if (isSelected) {
+        FilterChipDefaults.filterChipColors(
+            containerColor = accentSoftContainer,
+            labelColor = accentSoftContent,
+            selectedContainerColor = accentSoftContainer,
+            selectedLabelColor = accentSoftContent
+        )
+    } else {
+        FilterChipDefaults.filterChipColors(
+            containerColor = cardSurface,
+            labelColor = textSecondary,
+            selectedContainerColor = accentSoftContainer,
+            selectedLabelColor = accentSoftContent
+        )
+    }
 }
 
 private fun PlanFrequency.sheetLabel(): String = when (ordinal) {
@@ -140,7 +154,6 @@ fun TargetCalculatorSheet(
     // field hilang setelah digit pertama (target > 0) dan fokus ketik terputus.
     val showTargetCard = remember { CurrencyFormatter.parse(initialTargetText) > 0L }
     val fieldColors = sheetFieldColors()
-    val chipColors = sheetChipColors()
 
     // Perhitungan live: tidak ada tombol "Hitung", hasil ikut setiap ketikan.
     val target = CurrencyFormatter.parse(targetText.text)
@@ -164,7 +177,8 @@ fun TargetCalculatorSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = colors.elevatedSurface
+        containerColor = colors.elevatedSurface,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -248,6 +262,25 @@ fun TargetCalculatorSheet(
                         else "Nominal per ${frequency.unitLabel()}"
                     )
                 },
+                leadingIcon = if (mode == 1) {
+                    {
+                        Text(
+                            text = currencyCode.symbol,
+                            color = colors.textSecondary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                } else null,
+                trailingIcon = if (mode == 0) {
+                    {
+                        Text(
+                            text = frequency.unitLabel(),
+                            color = colors.textSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else null,
                 singleLine = true,
                 shape = SheetFieldShape,
                 colors = fieldColors,
@@ -264,8 +297,18 @@ fun TargetCalculatorSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowValues.forEach { quick ->
+                            val isQuickSelected = inputValue == quick
+                            val quickChipColors = sheetChipColors(isQuickSelected)
+                            val quickBorder = if (isQuickSelected) {
+                                androidx.compose.foundation.BorderStroke(1.dp, colors.accentBlue.copy(alpha = 0.8f))
+                            } else {
+                                androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (colors.background == Color(0xFF000000)) Color(0xFF343434) else Color(0xFFDCE0E5)
+                                )
+                            }
                             FilterChip(
-                                selected = inputValue == quick,
+                                selected = isQuickSelected,
                                 onClick = { inputText = CurrencyFormatter.inputValue(quick) },
                                 label = {
                                     Text(
@@ -279,7 +322,8 @@ fun TargetCalculatorSheet(
                                         softWrap = false
                                     )
                                 },
-                                colors = chipColors,
+                                colors = quickChipColors,
+                                border = quickBorder,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -289,11 +333,15 @@ fun TargetCalculatorSheet(
 
             // Kartu hasil live beraksen biru lembut.
             if (valid) {
+                val isDarkResult = colors.background == Color(0xFF000000)
+                val resultBg = if (isDarkResult) Color(0xFF162B3D) else Color(0xFFEBF5FF)
+                val resultBorder = colors.accentBlue.copy(alpha = 0.4f)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(SheetCardShape)
-                        .background(colors.accentSoftContainer)
+                        .background(resultBg)
+                        .border(1.dp, resultBorder, SheetCardShape)
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
@@ -340,20 +388,25 @@ fun TargetCalculatorSheet(
 @Composable
 private fun SheetPillTrack(labels: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
     val colors = LocalSisihinColors.current
+    val isDark = colors.background == Color(0xFF000000)
+    val trackBg = if (isDark) Color(0xFF222222) else Color(0xFFF1F3F5)
+    val trackBorder = if (isDark) Color(0xFF323232) else Color(0xFFE0E3E8)
+    val activeBg = if (isDark) Color(0xFF162B3D) else colors.accentBlue
+    val activeText = if (isDark) colors.accentSoftContent else Color(0xFFFFFFFF)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(46.dp)
             .clip(SheetTrackShape)
-            .background(colors.cardSurface)
-            .border(0.8.dp, colors.hairlineBorder, SheetTrackShape)
+            .background(trackBg)
+            .border(1.dp, trackBorder, SheetTrackShape)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         labels.forEachIndexed { index, label ->
             val active = index == selectedIndex
             val backgroundColor by animateThemeColor(
-                targetValue = if (active) colors.accentSoftContainer else Color.Transparent,
+                targetValue = if (active) activeBg else Color.Transparent,
                 animationSpec = SheetSpring,
                 label = "sheetTrack$label"
             )
@@ -368,7 +421,7 @@ private fun SheetPillTrack(labels: List<String>, selectedIndex: Int, onSelect: (
             ) {
                 Text(
                     label,
-                    color = if (active) colors.accentSoftContent else colors.textSecondary,
+                    color = if (active) activeText else colors.textSecondary,
                     fontSize = 13.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     maxLines = 1,
