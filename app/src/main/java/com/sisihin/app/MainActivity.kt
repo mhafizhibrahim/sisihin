@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -31,11 +32,20 @@ import com.sisihin.app.core.security.BiometricAuthManager
 import com.sisihin.app.core.theme.LocalSisihinColors
 import com.sisihin.app.core.theme.SisihinTheme
 import com.sisihin.app.domain.model.AppThemeMode
+import com.sisihin.app.data.update.UpdateChecker
 import com.sisihin.app.presentation.common.SisihinNavHost
 import com.sisihin.app.presentation.lock.AppLockOverlay
+import com.sisihin.app.presentation.update.UpdateDialog
+import com.sisihin.app.presentation.update.openUpdateUrl
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 class MainActivity : FragmentActivity() {
+
+    companion object {
+        // Cek update otomatis cukup sekali per proses, bukan per recreate activity.
+        private var autoUpdateChecked = false
+    }
 
     private var isPromptActive = false
 
@@ -92,6 +102,21 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
+            // Cek update otomatis: sekali per proses, di background, tanpa
+            // memblokir splash/biometrik. Gagal (offline/404/rate-limit) senyap.
+            val currentVersion = remember { UpdateChecker.currentVersion(this@MainActivity) }
+            var pendingUpdate by remember { mutableStateOf<UpdateChecker.ReleaseInfo?>(null) }
+            LaunchedEffect(Unit) {
+                snapshotFlow { locked }.first { !it }
+                if (autoUpdateChecked) return@LaunchedEffect
+                autoUpdateChecked = true
+                delay(1000)
+                val release = UpdateChecker.fetchLatestRelease()
+                if (release != null && UpdateChecker.isNewerVersion(release.version, currentVersion)) {
+                    pendingUpdate = release
+                }
+            }
+
             SisihinTheme(isDarkTheme = isDarkTheme) {
                 val colors = LocalSisihinColors.current
                 Box(
@@ -114,6 +139,20 @@ class MainActivity : FragmentActivity() {
 
                 if (locked) {
                     AppLockOverlay(onUnlockClick = { requestBiometric() })
+                }
+
+                if (!locked) {
+                    pendingUpdate?.let { release ->
+                        UpdateDialog(
+                            release = release,
+                            currentVersion = currentVersion,
+                            onUpdateClick = {
+                                openUpdateUrl(this@MainActivity, release.downloadUrl)
+                                pendingUpdate = null
+                            },
+                            onDismiss = { pendingUpdate = null }
+                        )
+                    }
                 }
 
                 BackHandler(enabled = locked) {

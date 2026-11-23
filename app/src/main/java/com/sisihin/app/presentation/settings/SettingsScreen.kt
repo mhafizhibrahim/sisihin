@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,13 +59,17 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.SystemUpdate
 import com.sisihin.app.SisihinApplication
 import com.sisihin.app.core.components.SisihinCard
 import com.sisihin.app.core.security.BiometricAuthManager
 import com.sisihin.app.core.theme.LocalSisihinColors
 import com.sisihin.app.core.theme.spacing
 import com.sisihin.app.data.repository.BackupRestoreManager
+import com.sisihin.app.data.update.UpdateChecker
 import com.sisihin.app.domain.model.AppThemeMode
+import com.sisihin.app.presentation.update.UpdateDialog
+import com.sisihin.app.presentation.update.openUpdateUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -85,6 +91,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     }
     var message by remember { mutableStateOf<String?>(null) }
     var delayMenu by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateRelease by remember { mutableStateOf<UpdateChecker.ReleaseInfo?>(null) }
     @Suppress("DEPRECATION")
     val versionName = remember {
         try {
@@ -103,6 +112,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             confirmButton = {
                 TextButton(onClick = { message = null }) { Text("OK", color = colors.accentSoftContent) }
             }
+        )
+    }
+
+    updateRelease?.let { release ->
+        UpdateDialog(
+            release = release,
+            currentVersion = versionName,
+            onUpdateClick = {
+                openUpdateUrl(context, release.downloadUrl)
+                updateRelease = null
+            },
+            onDismiss = { updateRelease = null }
         )
     }
 
@@ -277,6 +298,52 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         Text(
                             "Aplikasi pelacak celengan dan target tabungan.",
                             color = colors.textSecondary
+                        )
+                    }
+                }
+            }
+
+            SisihinCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !checkingUpdate) {
+                            checkingUpdate = true
+                            scope.launch {
+                                val release = UpdateChecker.fetchLatestRelease()
+                                checkingUpdate = false
+                                when {
+                                    release == null ->
+                                        message = "Gagal memeriksa pembaruan, cek koneksi internet"
+                                    UpdateChecker.isNewerVersion(release.version, versionName) ->
+                                        updateRelease = release
+                                    else ->
+                                        message = "Aplikasi sudah versi terbaru"
+                                }
+                            }
+                        }
+                        .padding(MaterialTheme.spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SystemUpdate,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = colors.textPrimary
+                    )
+                    Column(modifier = Modifier.weight(1f).padding(start = MaterialTheme.spacing.md)) {
+                        Text("Cek Pembaruan", color = colors.textPrimary, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Periksa versi terbaru Sisihin",
+                            color = colors.textSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (checkingUpdate) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = colors.accentBlue,
+                            strokeWidth = 2.dp
                         )
                     }
                 }
