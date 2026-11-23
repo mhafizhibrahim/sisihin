@@ -60,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -128,6 +129,7 @@ fun GoalDetailScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRecordDialog by remember { mutableStateOf(false) }
+    var recordInitialType by remember { mutableStateOf(TransactionType.DEPOSIT) }
     var editingTx by remember { mutableStateOf<SavingsTransactionEntity?>(null) }
     var selectedTx by remember { mutableStateOf<SavingsTransactionEntity?>(null) }
     var showPhotoPreview by remember { mutableStateOf(false) }
@@ -186,10 +188,11 @@ fun GoalDetailScreen(
 
     if (showRecordDialog && !archived) {
         RecordTransactionDialog(
-            initialType = editingTx?.type ?: TransactionType.DEPOSIT,
+            initialType = editingTx?.type ?: recordInitialType,
             initialAmount = editingTx?.amount ?: 0L,
             initialNote = editingTx?.note.orEmpty(),
             collected = uiState.collected,
+            targetAmount = goal.targetAmount,
             planAmount = goal.planAmount,
             currencyCode = goal.currencyCode,
             onDismiss = { showRecordDialog = false },
@@ -384,12 +387,15 @@ fun GoalDetailScreen(
                 } else {
                     ActionButtonsBlock(
                         amounts = uiState.suggestedAmounts,
+                        canWithdraw = uiState.collected > 0,
                         onDeposit = {
                             editingTx = null
+                            recordInitialType = TransactionType.DEPOSIT
                             showRecordDialog = true
                         },
                         onWithdraw = {
                             editingTx = null
+                            recordInitialType = TransactionType.WITHDRAW
                             showRecordDialog = true
                         },
                         onPickAmount = { amount ->
@@ -666,6 +672,7 @@ private fun BalanceBlock(goal: SavingsGoalEntity, collected: Long) {
 @Composable
 private fun ActionButtonsBlock(
     amounts: List<Long>,
+    canWithdraw: Boolean,
     onDeposit: () -> Unit,
     onWithdraw: () -> Unit,
     onPickAmount: (Long) -> Unit
@@ -679,22 +686,28 @@ private fun ActionButtonsBlock(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(
-                modifier = Modifier.weight(1f).height(52.dp).clickable(onClick = onDeposit),
+                onClick = onDeposit,
+                modifier = Modifier.weight(1f).height(52.dp),
                 shape = CirclePillShape,
                 color = colors.accentBlue
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("+ Tabung", color = colors.onAccent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("+ Tambah", color = colors.onAccent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Surface(
-                modifier = Modifier.weight(1f).height(52.dp).clickable(onClick = onWithdraw),
+                onClick = onWithdraw,
+                enabled = canWithdraw,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
+                    .alpha(if (canWithdraw) 1f else 0.4f),
                 shape = CirclePillShape,
                 color = colors.cardSurface,
                 border = BorderStroke(0.8.dp, colors.hairlineBorder)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("- Tarik", color = colors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("- Kurangi", color = colors.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

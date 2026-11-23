@@ -1,5 +1,7 @@
 package com.sisihin.app.presentation.detail
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,13 +30,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,13 +48,20 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sisihin.app.core.theme.LocalSisihinColors
+import com.sisihin.app.core.theme.animateThemeColor
 import com.sisihin.app.core.util.CurrencyFormatter
+import com.sisihin.app.core.util.SavingsCalculator
 import com.sisihin.app.domain.model.CurrencyCode
 import com.sisihin.app.domain.model.TransactionType
+import kotlinx.coroutines.delay
 
 /** Label chip cepat: angka saja tanpa simbol mata uang (mis. 10.000). */
 private fun shortcutLabel(amount: Long, currency: CurrencyCode): String =
     CurrencyFormatter.format(amount, currency).removePrefix(currency.symbol).trim()
+
+/** Tanpa spasi setelah simbol: Rp220.000, bukan Rp 220.000. */
+private fun compactMoney(amount: Long, currency: CurrencyCode): String =
+    CurrencyFormatter.format(amount, currency).replace(Regex("\\s+"), "")
 
 @Composable
 private fun dialogFieldColors() = with(LocalSisihinColors.current) {
@@ -81,6 +95,7 @@ fun RecordTransactionDialog(
     initialAmount: Long = 0L,
     initialNote: String = "",
     collected: Long,
+    targetAmount: Long = 0L,
     planAmount: Long,
     currencyCode: CurrencyCode = CurrencyCode.IDR,
     onDismiss: () -> Unit,
@@ -94,14 +109,44 @@ fun RecordTransactionDialog(
         )
     }
     var note by remember { mutableStateOf(initialNote) }
-    var showError by remember { mutableStateOf(false) }
 
     val quickAmounts = remember(planAmount) {
         val base = if (planAmount > 0) planAmount else 10_000L
         listOf(base, base * 2, base * 3, (base * 5).coerceAtLeast(100_000L)).distinct().sorted()
     }
     val amount = CurrencyFormatter.parse(amountText.text)
-    val exceedsBalance = type == TransactionType.WITHDRAW && amount > collected
+    val isWithdraw = type == TransactionType.WITHDRAW
+    // Validasi live: error ikut hilang sendiri saat berganti tab / mengubah nominal.
+    val exceedsBalance = isWithdraw && amount > collected
+    val canSave = amount > 0 && !exceedsBalance
+
+    // Aksen dinamis: biru untuk Tambah, merah koral untuk Kurangi.
+    val accent = if (isWithdraw) colors.negativeRed else colors.accentBlue
+    val pillSpring = spring<Color>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
+    val saveColor by animateThemeColor(accent, pillSpring, label = "recordSave")
+
+    // Pratinjau saldo & progres real-time.
+    val previewBalance = if (isWithdraw) {
+        (collected - amount).coerceAtLeast(0L)
+    } else {
+        collected + amount
+    }
+    val previewPercent = SavingsCalculator.percent(targetAmount, previewBalance).toInt()
+    val previewText = if (isWithdraw) {
+        "Sisa saldo: ${compactMoney(previewBalance, currencyCode)} ($previewPercent%)"
+    } else {
+        "Saldo setelahnya: ${compactMoney(previewBalance, currencyCode)} ($previewPercent%)"
+    }
+
+    // Fokus otomatis ke kolom Nominal agar pengguna bisa langsung mengetik.
+    val amountFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(150) // tunggu window dialog siap menerima fokus
+        amountFocus.requestFocus()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -117,7 +162,10 @@ fun RecordTransactionDialog(
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.imePadding(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
                     color = colors.cardSurface,
@@ -126,16 +174,23 @@ fun RecordTransactionDialog(
                     Row(modifier = Modifier.fillMaxWidth().padding(3.dp)) {
                         listOf(TransactionType.DEPOSIT, TransactionType.WITHDRAW).forEach { option ->
                             val selected = type == option
+                            val optionAccent = if (option == TransactionType.WITHDRAW) {
+                                colors.negativeRed
+                            } else {
+                                colors.accentBlue
+                            }
+                            val pillColor by animateThemeColor(
+                                targetValue = if (selected) optionAccent else colors.cardSurface,
+                                animationSpec = pillSpring,
+                                label = "recordTab${option.name}"
+                            )
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(999.dp))
-                                    .background(if (selected) colors.accentBlue else colors.cardSurface)
-                                    .clickable {
-                                        type = option
-                                        showError = false
-                                    },
+                                    .background(pillColor)
+                                    .clickable { type = option },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -160,10 +215,7 @@ fun RecordTransactionDialog(
                     ) {
                         OutlinedTextField(
                             value = amountText,
-                            onValueChange = {
-                                amountText = CurrencyFormatter.formatInput(it)
-                                showError = false
-                            },
+                            onValueChange = { amountText = CurrencyFormatter.formatInput(it) },
                             label = { Text("Nominal") },
                             leadingIcon = {
                                 Icon(
@@ -175,20 +227,39 @@ fun RecordTransactionDialog(
                             },
                             colors = dialogFieldColors(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            isError = showError,
-                            supportingText = if (showError) {
-                                {
-                                    Text(
-                                        "Nominal penarikan melebihi saldo terkumpul.",
-                                        color = colors.negativeRed,
-                                        fontSize = 12.sp
-                                    )
+                            isError = exceedsBalance,
+                            supportingText = when {
+                                exceedsBalance -> {
+                                    {
+                                        Text(
+                                            "Nominal melebihi saldo terkumpul",
+                                            color = colors.negativeRed,
+                                            fontSize = 12.sp
+                                        )
+                                    }
                                 }
-                            } else {
-                                null
+                                isWithdraw -> {
+                                    {
+                                        Text(
+                                            "Tersedia: ${compactMoney(collected, currencyCode)}",
+                                            color = colors.textMuted,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                                else -> null
                             },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(amountFocus)
+                        )
+
+                        // Pratinjau saldo & progres setelah transaksi ini.
+                        Text(
+                            text = previewText,
+                            color = if (exceedsBalance) colors.negativeRed else colors.textSecondary,
+                            fontSize = 12.sp
                         )
 
                         // 2 chip per baris: dengan 4 chip sebaris angka seperti 100.000 terpotong.
@@ -203,7 +274,6 @@ fun RecordTransactionDialog(
                                             selected = amount == quick,
                                             onClick = {
                                                 amountText = CurrencyFormatter.inputValue(quick)
-                                                showError = false
                                             },
                                             label = {
                                                 Text(
@@ -225,6 +295,17 @@ fun RecordTransactionDialog(
                             value = note,
                             onValueChange = { note = it },
                             label = { Text("Keterangan") },
+                            placeholder = {
+                                Text(
+                                    text = if (isWithdraw) {
+                                        "Opsional, mis. Keperluan mendadak"
+                                    } else {
+                                        "Opsional, mis. Gaji, Bonus"
+                                    },
+                                    color = colors.textMuted,
+                                    fontSize = 14.sp
+                                )
+                            },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.ShortText,
@@ -243,18 +324,15 @@ fun RecordTransactionDialog(
         },
         confirmButton = {
             Surface(
-                onClick = {
-                    if (exceedsBalance) {
-                        showError = true
-                    } else if (amount > 0) {
-                        onSave(type, amount, note.trim())
-                    }
-                },
+                onClick = { if (canSave) onSave(type, amount, note.trim()) },
+                enabled = canSave,
                 shape = RoundedCornerShape(999.dp),
-                color = colors.accentBlue
+                color = saveColor
             ) {
                 Box(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .alpha(if (canSave) 1f else 0.5f)
+                        .padding(horizontal = 24.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
