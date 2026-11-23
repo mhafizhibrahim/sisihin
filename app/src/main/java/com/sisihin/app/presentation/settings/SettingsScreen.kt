@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -129,6 +130,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
     Scaffold(
         containerColor = colors.background,
+        // Outer Scaffold di SisihinNavHost sudah menangani bottomBar + system bars.
+        // Tanpa ini, inset navigation bar diterapkan dua kali dan menyisakan celah hitam.
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
                 title = { Text("Pengaturan", color = colors.textPrimary) },
