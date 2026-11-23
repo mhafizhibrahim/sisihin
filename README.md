@@ -11,6 +11,8 @@ Namanya dari kata "sisihin" — sisihkan uang sedikit-sedikit sampai targetnya k
 ![GitHub release](https://img.shields.io/github/v/release/mhafizhibrahim/sisihin)
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-brightgreen)
 
+Versi terbaru: **v1.1.2** (GitHub Releases)
+
 ## Fitur
 
 - Bikin celengan dengan target nominal, foto, dan rencana nabung harian/mingguan/bulanan. Ada estimasi kapan target tercapai.
